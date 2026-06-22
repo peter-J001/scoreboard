@@ -298,13 +298,13 @@ html, body {
   border-radius: 20px;
   padding: 24px;
   text-align: center;
-  max-width: 320px;
+  max-width: 360px;
   width: 90%;
 }
 
 #qr-canvas {
-  width: 230px;
-  height: 230px;
+  width: 260px;
+  height: 260px;
   display: block;
   margin: 0 auto;
   image-rendering: pixelated;
@@ -1293,7 +1293,7 @@ var QR = (function() {
 })();
 
 function drawQR(text) {
-  var qr = QR.generate(text, 'L');
+  var qr = QR.generate(text, 'M');
   var c = document.getElementById('qr-canvas');
   var dpr = window.devicePixelRatio || 1;
   var size = qr.size;
@@ -1301,7 +1301,7 @@ function drawQR(text) {
   var total = size + quiet * 2;
 
   // 1. 整数模块尺寸：用 260 反推，取整得到 moduleSize
-  var moduleSize = Math.floor(260 / total);
+  var moduleSize = Math.floor(300 / total);
   var px = total * moduleSize; // 整数画布尺寸 = 总模块数 × 整数缩放
 
   // 2. 统一原生/CSS 宽高 + 适配 dpr
