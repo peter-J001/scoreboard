@@ -1295,33 +1295,40 @@ var QR = (function() {
 function drawQR(text) {
   var qr = QR.generate(text, 'L');
   var c = document.getElementById('qr-canvas');
+  var dpr = window.devicePixelRatio || 1;
   var size = qr.size;
-  var quiet = 4; // 4-module quiet zone (QR spec minimum)
-  var moduleSize = 10; // pixels per module at native resolution
+  var quiet = 4;
   var total = size + quiet * 2;
-  var canvasSize = total * moduleSize;
 
-  // Set canvas to exact pixel dimensions — no fractional scaling
-  c.width = canvasSize;
-  c.height = canvasSize;
-  // CSS display size (square, fits mobile screens)
-  c.style.width = '250px';
-  c.style.height = '250px';
+  // 1. 整数模块尺寸：用 260 反推，取整得到 moduleSize
+  var moduleSize = Math.floor(260 / total);
+  var px = total * moduleSize; // 整数画布尺寸 = 总模块数 × 整数缩放
+
+  // 2. 统一原生/CSS 宽高 + 适配 dpr
+  c.width = px * dpr;
+  c.height = px * dpr;
+  c.style.width = px + 'px';
+  c.style.height = px + 'px';
 
   var ctx = c.getContext('2d');
-  // Disable anti-aliasing for crisp module edges
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.imageSmoothingEnabled = false;
 
-  // White background
+  // 白底
   ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, canvasSize, canvasSize);
+  ctx.fillRect(0, 0, px, px);
 
-  // Black modules — each module is exactly moduleSize×moduleSize pixels
+  // 3. 绘制坐标：整数 moduleSize，无小数偏移
   ctx.fillStyle = '#000';
   for (var r = 0; r < size; r++) {
     for (var col = 0; col < size; col++) {
       if (qr.matrix[r][col]) {
-        ctx.fillRect((quiet + col) * moduleSize, (quiet + r) * moduleSize, moduleSize, moduleSize);
+        ctx.fillRect(
+          (quiet + col) * moduleSize,
+          (quiet + r) * moduleSize,
+          moduleSize,
+          moduleSize
+        );
       }
     }
   }
