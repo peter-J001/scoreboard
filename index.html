@@ -1138,6 +1138,14 @@ var QR = (function() {
       for (var b = 0; b < blocks.length; b++)
         if (e < blocks[b].ec.length) result.push(blocks[b].ec[e]);
 
+    // Convert codeword bytes to bits for matrix placement
+    var dataBits = [];
+    for (var i = 0; i < result.length; i++) {
+      for (var b = 7; b >= 0; b--) {
+        dataBits.push((result[i] >> b) & 1);
+      }
+    }
+
     // Build matrix
     var size = ver * 4 + 17;
     var matrix = new Array(size);
@@ -1200,7 +1208,7 @@ var QR = (function() {
         for (var dc = 0; dc < 2; dc++) {
           var col = c - dc;
           if (col < 0 || matrix[r][col] !== null) continue;
-          matrix[r][col] = dataIdx < result.length ? result[dataIdx++] : 0;
+          matrix[r][col] = dataIdx < dataBits.length ? dataBits[dataIdx++] : 0;
         }
       }
       up = !up;
