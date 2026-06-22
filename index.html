@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>记分板</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  width: 100%; height: 100%;
+  position: relative;
+  min-height: 0;
+}
+
+/* ===== Time ===== */
+#time {
+  text-align: center;
+  font-size: clamp(14px, 3vw, 18px);
+  color: #666;
+  padding: 12px 0 4px;
+  flex-shrink: 0;
+  letter-spacing: 2px;
+}
+
+/* ===== Score Area ===== */
+#score-area {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  position: relative;
+  gap: 2px;
+}
+
+#app.fs-mode #score-area {
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.team {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  min-height: 0;
+}
+
+#app.fs-mode .team {
+  overflow: hidden;
+}
+
+.team-label {
+  font-size: clamp(20px, 5vw, 32px);
+  font-weight: 700;
+  letter-spacing: 4px;
+  margin-bottom: 8px;
+}
+
+.team-score {
+  font-size: clamp(80px, 28vmin, 200px);
+  font-weight: 900;
+  line-height: 1;
+  transition: transform 0.1s ease;
+}
+
+.team.blue .team-label { color: #3B82F6; }
+.team.blue .team-score { color: #3B82F6; }
+
+.team.red .team-label { color: #EF4444; }
+.team.red .team-score { color: #EF4444; }
+
+/* Score pop animation */
+.score-pop { animation: pop 0.15s ease; }
+@keyframes pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+/* ===== Hint ===== */
+#hint {
+  text-align: center;
+  font-size: 12px;
+  color: #444;
+  padding: 6px 0;
+  flex-shrink: 0;
+  letter-spacing: 1px;
+  min-height: 22px;
+}
+
+#hint.fullscreen-hint {
+  color: #555;
+  font-size: 13px;
+}
+
+/* ===== Buttons ===== */
+#buttons {
+  display: flex;
+  gap: 12px;
+  padding: 10px 20px 20px;
+  flex-shrink: 0;
+  justify-content: center;
+}
+
+.btn {
+  flex: 1;
+  max-width: 160px;
+  padding: 14px 0;
+  border: 2px solid #333;
+  border-radius: 12px;
+  background: transparent;
+  color: #aaa;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn:active {
+  background: #1a1a1a;
+  border-color: #555;
+  color: #fff;
+}
+
+.btn.fullscreen-btn {
+  border-color: #3B82F6;
+  color: #3B82F6;
+}
+
+.btn.fullscreen-btn:active {
+  background: rgba(59,130,246,0.15);
+}
+
+/* ===== Panel Toggle ===== */
+#panel-toggle {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #1a1a1a;
+  border: 2px solid #333;
+  color: #888;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 100;
+  transition: all 0.3s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#panel-toggle:active {
+  background: #333;
+  color: #fff;
+}
+
+#panel-toggle.open {
+  transform: rotate(90deg);
+  background: #333;
+  color: #fff;
+}
+
+/* ===== Panel ===== */
+#panel {
+  position: fixed;
+  bottom: 84px;
+  right: 12px;
+  width: calc(100vw - 24px);
+  max-width: 360px;
+  max-height: 0;
+  overflow: hidden;
+  background: #111;
+  border-radius: 16px;
+  z-index: 99;
+  transition: max-height 0.35s ease, opacity 0.3s ease, padding 0.35s ease;
+  opacity: 0;
+  border: 0px solid #222;
+}
+
+#panel.open {
+  max-height: calc(100vh - 110px);
+  opacity: 1;
+  border-width: 1px;
+  overflow-y: auto;
+}
+
+#panel-inner {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.panel-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.panel-btn {
+  flex: 1;
+  min-width: calc(50% - 4px);
+  padding: 12px 8px;
+  border: 1px solid #333;
+  border-radius: 10px;
+  background: #1a1a1a;
+  color: #ccc;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.panel-btn:active {
+  background: #333;
+  border-color: #555;
+}
+
+.panel-btn.danger {
+  border-color: #5c1a1a;
+  color: #EF4444;
+}
+
+.panel-btn.danger:active {
+  background: #3b1010;
+}
+
+.panel-divider {
+  height: 1px;
+  background: #222;
+  margin: 6px 0;
+}
+
+.panel-title {
+  font-size: 11px;
+  color: #666;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.panel-hint {
+  font-size: 11px;
+  color: #555;
+  line-height: 1.5;
+  padding: 0 2px;
+}
+
+.share-btn {
+  width: 100%;
+  border-color: #3B82F6 !important;
+  color: #3B82F6 !important;
+}
+
+/* ===== QR Modal ===== */
+#qr-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 300;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+#qr-overlay.show {
+  display: flex;
+}
+
+#qr-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 24px;
+  text-align: center;
+  max-width: 320px;
+  width: 90%;
+}
+
+#qr-canvas {
+  width: 230px;
+  height: 230px;
+  display: block;
+  margin: 0 auto;
+  image-rendering: pixelated;
+}
+
+#qr-card .qr-title {
+  color: #000;
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+#qr-card .qr-hint {
+  color: #666;
+  font-size: 12px;
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+#qr-close {
+  margin-top: 16px;
+  padding: 10px 40px;
+  border: none;
+  border-radius: 10px;
+  background: #000;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #1a1a1a;
+  border-radius: 8px;
+  border: 1px solid #222;
+  font-size: 12px;
+  gap: 8px;
+}
+
+.history-item .hi-time { color: #666; font-size: 11px; }
+.history-item .hi-blue { color: #3B82F6; font-weight: 700; }
+.history-item .hi-red { color: #EF4444; font-weight: 700; }
+.history-item .hi-vs { color: #555; }
+
+.history-del {
+  background: none;
+  border: 1px solid #5c1a1a;
+  color: #EF4444;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.history-del:active { background: #3b1010; }
+
+#history-list { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; }
+.empty-history { text-align: center; color: #444; font-size: 13px; padding: 20px 0; }
+
+/* ===== Toast ===== */
+#toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 24px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  z-index: 200;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  pointer-events: none;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  color: #fff;
+}
+
+#toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(4px);
+}
+
+#toast.success { border-color: #22c55e; color: #22c55e; }
+#toast.error { border-color: #EF4444; color: #EF4444; }
+
+/* ===== Hidden file input ===== */
+#file-input { display: none; }
+
+/* ===== Fullscreen styles (via .fs-mode class) ===== */
+#app.fs-mode {
+  background: #000;
+  overflow: hidden;
+}
+
+#app.fs-mode #buttons {
+  display: none;
+}
+
+#app.fs-mode #panel-toggle {
+  display: none;
+}
+
+#app.fs-mode #panel {
+  display: none;
+}
+
+#app.fs-mode #hint {
+  color: #555;
+  font-size: 13px;
+}
+
+#app.fs-mode .team {
+  cursor: default;
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="time">--:--</div>
+
+  <div id="score-area">
+    <div class="team blue" data-team="blue">
+      <div class="team-label">蓝 队</div>
+      <div class="team-score">0</div>
+    </div>
+    <div class="team red" data-team="red">
+      <div class="team-label">红 队</div>
+      <div class="team-score">0</div>
+    </div>
+  </div>
+
+  <div id="hint">↑ 上滑加分 ↓ 下滑减分</div>
+
+  <div id="buttons">
+    <button class="btn" id="btn-reset">重置本局</button>
+    <button class="btn fullscreen-btn" id="btn-fullscreen">全屏计分</button>
+  </div>
+</div>
+
+<button id="panel-toggle">≡</button>
+
+<div id="panel">
+  <div id="panel-inner">
+    <div class="panel-section">
+      <button class="panel-btn" id="btn-save">保存本场记录</button>
+      <button class="panel-btn" id="btn-new-game">新建对局清零</button>
+    </div>
+    <div class="panel-section">
+      <button class="panel-btn" id="btn-copy">复制记录文本</button>
+      <button class="panel-btn" id="btn-export">导出 JSON 文件</button>
+    </div>
+    <div class="panel-section">
+      <button class="panel-btn" id="btn-paste">粘贴文本导入</button>
+      <button class="panel-btn" id="btn-import">上传 JSON 导入</button>
+    </div>
+    <div class="panel-divider"></div>
+    <div class="panel-title">分享页面给好友</div>
+    <button class="panel-btn share-btn" id="btn-share-page">发送页面文件</button>
+    <button class="panel-btn share-btn" id="btn-qrcode">生成分享二维码</button>
+    <div class="panel-hint">点击"发送页面文件"可通过 AirDrop / 附近分享 直接发送给好友，对方浏览器直接打开。</div>
+    <div class="panel-divider"></div>
+    <div class="panel-title">历史记录</div>
+    <div id="history-list"><div class="empty-history">暂无记录</div></div>
+    <button class="panel-btn danger" id="btn-clear-all">一键清空全部记录</button>
+  </div>
+</div>
+
+<div id="qr-overlay" onclick="if(event.target===this)this.classList.remove('show')">
+  <div id="qr-card">
+    <div class="qr-title">扫描二维码获取记分板</div>
+    <canvas id="qr-canvas" width="260" height="260"></canvas>
+    <div class="qr-hint" id="qr-hint-text">用手机相机扫描二维码即可打开</div>
+    <button id="qr-close" onclick="document.getElementById('qr-overlay').classList.remove('show')">关闭</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<input type="file" id="file-input" accept=".json">
+
+<script>
+// ==================== DOM refs ====================
+const $app = document.getElementById('app');
+const $time = document.getElementById('time');
+const $scoreArea = document.getElementById('score-area');
+const $hint = document.getElementById('hint');
+const $panelToggle = document.getElementById('panel-toggle');
+const $panel = document.getElementById('panel');
+const $historyList = document.getElementById('history-list');
+const $toast = document.getElementById('toast');
+const $fileInput = document.getElementById('file-input');
+
+// ==================== State ====================
+const state = {
+  blueScore: 0,
+  redScore: 0,
+  isFullscreen: false,
+  isPanelOpen: false,
+  orientation: 'portrait'
+};
+
+// ==================== Storage ====================
+const STORAGE_KEY = 'scoreboard_state';
+const RECORDS_KEY = 'scoreboard_records';
+
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      blueScore: state.blueScore,
+      redScore: state.redScore
+    }));
+  } catch(e) { /* storage full or unavailable */ }
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      state.blueScore = data.blueScore || 0;
+      state.redScore = data.redScore || 0;
+    }
+  } catch(e) { /* ignore corrupt data */ }
+}
+
+function loadRecords() {
+  try {
+    const raw = localStorage.getItem(RECORDS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch(e) { return []; }
+}
+
+function saveRecords(records) {
+  try {
+    localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
+  } catch(e) {
+    showToast('存储空间不足', 'error');
+  }
+}
+
+// ==================== UI Updates ====================
+function updateScoreDisplay() {
+  document.querySelector('.team.blue .team-score').textContent = state.blueScore;
+  document.querySelector('.team.red .team-score').textContent = state.redScore;
+}
+
+function animateScore(team) {
+  const el = document.querySelector(`.team.${team} .team-score`);
+  el.classList.remove('score-pop');
+  void el.offsetWidth;
+  el.classList.add('score-pop');
+}
+
+function updateScore(team, delta) {
+  if (team === 'blue') {
+    state.blueScore = Math.max(0, state.blueScore + delta);
+  } else {
+    state.redScore = Math.max(0, state.redScore + delta);
+  }
+  updateScoreDisplay();
+  animateScore(team);
+  saveState();
+}
+
+function updateOrientationUI() {
+  $hint.textContent = '↑ 上滑加分 ↓ 下滑减分';
+  if (state.isFullscreen) {
+    $hint.classList.add('fullscreen-hint');
+  } else {
+    $hint.classList.remove('fullscreen-hint');
+  }
+}
+
+function updateTime() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  $time.textContent = h + ':' + m;
+}
+
+function renderHistory() {
+  const records = loadRecords();
+  if (records.length === 0) {
+    $historyList.innerHTML = '<div class="empty-history">暂无记录</div>';
+    return;
+  }
+  $historyList.innerHTML = records.slice().reverse().map(r => `
+    <div class="history-item">
+      <span class="hi-time">${escapeHtml(r.datetime)}</span>
+      <span class="hi-blue">蓝 ${r.blueScore}</span>
+      <span class="hi-vs">:</span>
+      <span class="hi-red">红 ${r.redScore}</span>
+      <button class="history-del" data-id="${r.id}" title="删除">×</button>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ==================== Toast ====================
+let toastTimer;
+function showToast(msg, type) {
+  clearTimeout(toastTimer);
+  $toast.textContent = msg;
+  $toast.className = 'show ' + (type || '');
+  toastTimer = setTimeout(() => { $toast.className = ''; }, 2000);
+}
+
+// ==================== Swipe Detection ====================
+const SWIPE_THRESHOLD = 20;
+
+function getSwipeDir(dx, dy) {
+  const absDx = Math.abs(dx);
+  const absDy = Math.abs(dy);
+  if (Math.max(absDx, absDy) < SWIPE_THRESHOLD) return null;
+  // Always prioritize vertical swipe (up/down) to avoid browser side-swipe conflicts
+  if (absDy > absDx) return dy < 0 ? 'up' : 'down';
+  if (absDx > absDy) return dx > 0 ? 'right' : 'left';
+  return null;
+}
+
+function initSwipe(teamEl) {
+  let startX = 0, startY = 0;
+  let tracking = false;
+
+  teamEl.addEventListener('touchstart', function(e) {
+    if (e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+  }, { passive: true });
+
+  teamEl.addEventListener('touchmove', function(e) {
+    if (!tracking) return;
+    // Prevent page scroll while swiping on score area
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  teamEl.addEventListener('touchend', function(e) {
+    if (!tracking) return;
+    tracking = false;
+
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    const dir = getSwipeDir(dx, dy);
+    const team = teamEl.dataset.team;
+
+    if (!dir) return;
+
+    if (dir === 'up') updateScore(team, 1);
+    else if (dir === 'down') updateScore(team, -1);
+  });
+}
+
+// ==================== Fullscreen ====================
+function requestFS() {
+  const el = $app;
+  if (el.requestFullscreen) {
+    el.requestFullscreen().catch(() => showToast('全屏模式不可用', 'error'));
+  } else if (el.webkitRequestFullscreen) {
+    el.webkitRequestFullscreen();
+  }
+}
+
+function exitFS() {
+  if (document.exitFullscreen) {
+    document.exitFullscreen();
+  } else if (document.webkitExitFullscreen) {
+    document.webkitExitFullscreen();
+  }
+}
+
+function isFS() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+
+function handleFSChange() {
+  state.isFullscreen = isFS();
+  if (state.isFullscreen) {
+    closePanel();
+    $app.classList.add('fs-mode');
+  } else {
+    $app.classList.remove('fs-mode');
+  }
+  updateOrientationUI();
+}
+
+// ==================== Panel ====================
+function openPanel() {
+  state.isPanelOpen = true;
+  $panel.classList.add('open');
+  $panelToggle.classList.add('open');
+  renderHistory();
+}
+
+function closePanel() {
+  state.isPanelOpen = false;
+  $panel.classList.remove('open');
+  $panelToggle.classList.remove('open');
+}
+
+function togglePanel() {
+  if (state.isPanelOpen) closePanel();
+  else openPanel();
+}
+
+// ==================== Actions ====================
+function resetGame() {
+  state.blueScore = 0;
+  state.redScore = 0;
+  updateScoreDisplay();
+  saveState();
+  showToast('已重置', 'success');
+}
+
+function newGame() {
+  state.blueScore = 0;
+  state.redScore = 0;
+  updateScoreDisplay();
+  saveState();
+  showToast('新对局已开始', 'success');
+}
+
+function saveRecord() {
+  if (state.blueScore === 0 && state.redScore === 0) {
+    showToast('当前无分数记录', 'error');
+    return;
+  }
+  const records = loadRecords();
+  const now = new Date();
+  const datetime = now.getFullYear() + '-' +
+    String(now.getMonth() + 1).padStart(2, '0') + '-' +
+    String(now.getDate()).padStart(2, '0') + ' ' +
+    String(now.getHours()).padStart(2, '0') + ':' +
+    String(now.getMinutes()).padStart(2, '0');
+  records.push({
+    id: Date.now(),
+    datetime: datetime,
+    blueScore: state.blueScore,
+    redScore: state.redScore
+  });
+  saveRecords(records);
+  renderHistory();
+  showToast('记录已保存', 'success');
+}
+
+function copyText() {
+  const records = loadRecords();
+  if (records.length === 0) {
+    showToast('暂无记录可复制', 'error');
+    return;
+  }
+  let text = '记分板 比赛记录\n';
+  text += '─'.repeat(24) + '\n';
+  records.forEach((r, i) => {
+    text += `${i + 1}. ${r.datetime}\n   蓝队 ${r.blueScore} : 红队 ${r.redScore}\n`;
+  });
+  text += '─'.repeat(24);
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('已复制到剪贴板', 'success');
+    }).catch(() => {
+      showToast('复制失败，请重试', 'error');
+    });
+  } else {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      showToast('已复制到剪贴板', 'success');
+    } catch(e) {
+      showToast('复制失败，请重试', 'error');
+    }
+    document.body.removeChild(ta);
+  }
+}
+
+function exportJSON() {
+  const records = loadRecords();
+  if (records.length === 0) {
+    showToast('暂无记录可导出', 'error');
+    return;
+  }
+  const blob = new Blob([JSON.stringify(records, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'scoreboard_backup_' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('导出成功', 'success');
+}
+
+function importRecords(newRecords) {
+  if (!Array.isArray(newRecords)) {
+    showToast('格式错误：需要JSON数组', 'error');
+    return;
+  }
+  const existing = loadRecords();
+  const existingIds = new Set(existing.map(r => r.id));
+  let added = 0;
+  newRecords.forEach(r => {
+    if (!r.datetime || typeof r.blueScore !== 'number' || typeof r.redScore !== 'number') {
+      return; // skip invalid
+    }
+    const id = r.id || Date.now() + Math.random();
+    if (!existingIds.has(id)) {
+      existing.push({ ...r, id });
+      existingIds.add(id);
+      added++;
+    }
+  });
+  saveRecords(existing);
+  renderHistory();
+  showToast(`导入成功，新增 ${added} 条记录`, 'success');
+}
+
+function pasteImport() {
+  if (!navigator.clipboard || !navigator.clipboard.readText) {
+    showToast('剪贴板不可用', 'error');
+    return;
+  }
+  navigator.clipboard.readText().then(text => {
+    try {
+      const data = JSON.parse(text);
+      importRecords(data);
+    } catch(e) {
+      showToast('剪贴板内容格式错误', 'error');
+    }
+  }).catch(() => {
+    showToast('读取剪贴板失败', 'error');
+  });
+}
+
+function fileImport(file) {
+  const reader = new FileReader();
+  reader.onload = function() {
+    try {
+      const data = JSON.parse(reader.result);
+      importRecords(data);
+    } catch(e) {
+      showToast('文件格式错误，无法解析', 'error');
+    }
+  };
+  reader.onerror = function() {
+    showToast('文件读取失败', 'error');
+  };
+  reader.readAsText(file);
+}
+
+function deleteRecord(id) {
+  const records = loadRecords();
+  const filtered = records.filter(r => String(r.id) !== String(id));
+  saveRecords(filtered);
+  renderHistory();
+  showToast('已删除', 'success');
+}
+
+async function sharePage() {
+  const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+  const file = new File([html], '记分板.html', { type: 'text/html' });
+
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        title: '记分板',
+        text: '篮球记分板页面',
+        files: [file]
+      });
+      showToast('分享成功', 'success');
+    } catch(e) {
+      if (e.name !== 'AbortError') {
+        showToast('分享失败，请重试', 'error');
+      }
+    }
+  } else {
+    // Fallback: download the file
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '记分板.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('已下载文件，可从文件管理器发送给好友', 'success');
+  }
+}
+
+function generateQRCode() {
+  var loc = window.location;
+  var url = loc.href;
+
+  // For hosted pages: QR from short URL — always fits
+  if (loc.protocol !== 'file:' && url.length < 2000) {
+    drawQR(url);
+    document.getElementById('qr-hint-text').textContent = '用手机相机扫描二维码即可打开记分板';
+    document.getElementById('qr-overlay').classList.add('show');
+    return;
+  }
+
+  // For local files: minify HTML and try as data:text/html URL
+  var html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+  var minified = html
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '')
+    .replace(/^[ \t]+/gm, '')
+    .replace(/[ \t]+$/gm, '')
+    .replace(/\n{2,}/g, '\n');
+
+  var dataUrl = 'data:text/html,' + encodeURIComponent(minified);
+
+  if (dataUrl.length <= 2800) {
+    drawQR(dataUrl);
+    document.getElementById('qr-hint-text').textContent = '用手机相机扫描二维码即可打开记分板';
+  } else {
+    showQRFallback();
+    document.getElementById('qr-hint-text').textContent = '推荐使用上方"发送页面文件"按钮（AirDrop / 附近分享）发送给好友';
+  }
+  document.getElementById('qr-overlay').classList.add('show');
+}
+
+function showQRFallback() {
+  var c = document.getElementById('qr-canvas');
+  var ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, 260, 260);
+  ctx.fillStyle = '#222';
+  ctx.font = 'bold 15px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('页面较大', 130, 110);
+  ctx.fillText('无法生成二维码', 130, 135);
+  ctx.fillStyle = '#666';
+  ctx.font = '12px -apple-system, sans-serif';
+  ctx.fillText('请使用"发送页面文件"', 130, 170);
+  ctx.fillText('AirDrop / 附近分享发送', 130, 190);
+}
+
+// ==================== QR Code Generator ====================
+var QR = (function() {
+  // GF(256) tables
+  var EXP = new Array(512), LOG = new Array(256);
+  (function() { for (var i = 0, x = 1; i < 255; i++) { EXP[i] = x; EXP[i+255] = x; LOG[x] = i; x <<= 1; if (x & 256) x ^= 285; } LOG[0] = 0; })();
+
+  function gfMul(a, b) { return (a && b) ? EXP[LOG[a] + LOG[b]] : 0; }
+
+  function gfPolyMul(p1, p2) {
+    var r = new Array(p1.length + p2.length - 1).fill(0);
+    for (var i = 0; i < p1.length; i++) for (var j = 0; j < p2.length; j++) r[i+j] ^= gfMul(p1[i], p2[j]);
+    return r;
+  }
+
+  function rsGenPoly(nsym) {
+    var g = [1];
+    for (var i = 0; i < nsym; i++) g = gfPolyMul(g, [1, EXP[i]]);
+    return g;
+  }
+
+  function rsEncode(data, nsym) {
+    var gen = rsGenPoly(nsym);
+    var res = new Array(data.length + nsym).fill(0);
+    for (var i = 0; i < data.length; i++) res[i] = data[i];
+    for (var i = 0; i < data.length; i++) {
+      var coef = res[i];
+      if (coef) for (var j = 0; j < gen.length; j++) res[i+j] ^= gfMul(gen[j], coef);
+    }
+    for (var i = 0; i < data.length; i++) res[i] = data[i];
+    return res;
+  }
+
+  // Version info: [total codewords, data codewords (L), data codewords (M), data codewords (Q), data codewords (H)]
+  var VINFO = [
+    null,[26,19,16,13,9],[44,34,28,22,16],[70,55,44,34,26],[100,80,64,48,36],
+    [134,108,86,62,46],[172,136,108,76,60],[196,156,124,88,66],[242,194,154,110,86],
+    [292,232,182,132,100],[346,274,216,154,122],[404,324,254,180,140],[466,370,290,206,158],
+    [532,428,334,244,180],[581,461,365,261,197],[655,523,415,295,223],[733,589,453,325,253],
+    [815,647,507,367,283],[901,721,563,397,313],[991,795,627,445,341],[1085,861,669,485,385],
+    [1156,932,714,512,406],[1258,1006,782,568,442],[1364,1094,860,614,464],
+    [1474,1174,914,664,514],[1588,1276,1000,718,538],[1706,1370,1062,754,596],
+    [1828,1468,1128,808,628],[1921,1531,1193,871,661],[2051,1631,1267,911,701],
+    [2185,1735,1373,985,745],[2323,1843,1455,1033,793],[2465,1955,1541,1115,845],
+    [2611,2071,1631,1171,901],[2761,2191,1725,1231,961],[2876,2308,1812,1286,986],
+    [3034,2434,1914,1354,1054],[3166,2566,1992,1426,1096],[3322,2702,2102,1502,1142],
+    [3482,2812,2216,1582,1222],[3646,2956,2334,1666,1276]
+  ];
+
+  // Alignment pattern positions
+  var APOS = [
+    null,[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],
+    [6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],
+    [6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],
+    [6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],
+    [6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],[6,30,54,78,102,126],
+    [6,26,52,78,104,130],[6,30,56,82,108,134],[6,34,60,86,112,138],
+    [6,30,58,86,114,142],[6,34,62,90,118,146],[6,30,54,78,102,126,150],
+    [6,24,50,76,102,128,154],[6,28,54,80,106,132,158],[6,32,58,84,110,136,162],
+    [6,26,54,82,110,138,166],[6,30,58,86,114,142,170]
+  ];
+
+  // Reminder bits for format info
+  var FORMAT_INFO = [
+    [1,0,1,0,1,1,1,0,0,0,1,1,0,0,1],[0,0,1,0,1,1,0,0,1,1,0,1,1,1,0],
+    [1,1,1,1,1,0,0,1,0,0,0,0,1,0,1],[0,1,0,0,0,1,1,0,1,1,0,1,1,1,1],
+    [1,1,1,1,0,1,1,1,1,0,0,1,0,0,0],[0,1,1,0,1,1,0,0,0,1,1,0,0,1,1],
+    [0,0,0,0,0,1,1,1,0,1,0,1,0,1,0],[1,1,0,1,1,1,1,0,0,1,1,0,1,1,1]
+  ];
+
+  function getBCHBits(val) {
+    var bch = val << 10;
+    for (var i = 4; i >= 0; i--) { var d = 1 << (i + 10); if (bch & d) bch ^= (0x537 << i); }
+    return ((val << 10) | (bch & 0x3FF)) ^ 0x5412;
+  }
+
+  function generate(data, ecLevel) {
+    ecLevel = ecLevel || 'L';
+    var eclIdx = {L:1,M:2,Q:3,H:4}[ecLevel] || 1;
+
+    // Determine version
+    var ver = 1;
+    var dataBits = data.length * 8;
+    for (; ver <= 40; ver++) {
+      var cap = VINFO[ver][eclIdx] * 8;
+      if (dataBits + 12 <= cap) break;
+    }
+    if (ver > 40) return null;
+
+    // Fill data with padding
+    var bytes = [];
+    for (var i = 0; i < data.length; i++) bytes.push(data.charCodeAt(i) & 0xFF);
+    var dc = VINFO[ver][eclIdx];
+    // Mode indicator (0100 = byte) + char count (8 or 16 bits) + data + terminator
+    var bits = [];
+    function addBits(val, len) { for (var i = len-1; i >= 0; i--) bits.push((val >> i) & 1); }
+
+    addBits(4, 4); // Byte mode
+    addBits(data.length, ver <= 9 ? 8 : 16); // Char count
+    for (var i = 0; i < bytes.length; i++) addBits(bytes[i], 8);
+    addBits(0, Math.min(4, dc * 8 - bits.length)); // Terminator
+    while (bits.length % 8) bits.push(0); // Pad to byte
+    // Pad bytes
+    var pad = [0xEC, 0x11];
+    for (var i = 0, pi = 0; bits.length < dc * 8; i++, pi = (pi+1)%2) {
+      addBits(pad[pi], 8);
+    }
+
+    // Convert to bytes array
+    var dataBytes = [];
+    for (var i = 0; i < bits.length; i += 8) {
+      var b = 0;
+      for (var j = 0; j < 8; j++) b = (b << 1) | (bits[i+j] || 0);
+      dataBytes.push(b);
+    }
+
+    // Split into blocks and apply RS
+    var totalCW = VINFO[ver][0];
+    var ecCW = totalCW - dc;
+    var blocksInGroup1 = 0, blocksInGroup2 = 0, cwPerBlock1 = 0, cwPerBlock2 = 0;
+
+    // Simplified block splitting
+    if (ver <= 2) { blocksInGroup1 = 1; cwPerBlock1 = dc; }
+    else if (ver <= 5) { blocksInGroup1 = 1; cwPerBlock1 = dc; }
+    else if (ver <= 7) { blocksInGroup1 = ver <= 6 ? 2 : 2; cwPerBlock1 = dc / 2; }
+    else {
+      // Use simplified split
+      var numBlocks = (ver <= 20) ? ((ver <= 14) ? ((ver <= 10) ? 2 : 3) : 4) : 5;
+      cwPerBlock1 = Math.floor(dc / numBlocks);
+      blocksInGroup1 = numBlocks - (dc % numBlocks);
+      cwPerBlock2 = cwPerBlock1 + 1;
+      blocksInGroup2 = numBlocks - blocksInGroup1;
+    }
+    if (blocksInGroup2 === 0) { blocksInGroup2 = blocksInGroup1; cwPerBlock2 = cwPerBlock1; }
+    if (blocksInGroup1 === 0) { blocksInGroup1 = blocksInGroup2; cwPerBlock1 = cwPerBlock2; }
+
+    var ecPerBlock = ecCW / (blocksInGroup1 + blocksInGroup2);
+
+    // Build blocks
+    var blocks = [];
+    var pos = 0;
+    for (var i = 0; i < blocksInGroup1; i++) {
+      blocks.push({ data: dataBytes.slice(pos, pos + cwPerBlock1), ec: null });
+      pos += cwPerBlock1;
+    }
+    for (var i = 0; i < blocksInGroup2; i++) {
+      blocks.push({ data: dataBytes.slice(pos, pos + cwPerBlock2), ec: null });
+      pos += cwPerBlock2;
+    }
+
+    // RS encode each block
+    for (var i = 0; i < blocks.length; i++) {
+      var encoded = rsEncode(blocks[i].data, ecPerBlock);
+      blocks[i].ec = encoded.slice(blocks[i].data.length);
+    }
+
+    // Interleave
+    var result = [];
+    for (var i = 0; i < Math.max(cwPerBlock1, cwPerBlock2); i++)
+      for (var j = 0; j < blocks.length; j++)
+        if (i < blocks[j].data.length) result.push(blocks[j].data[i]);
+    for (var i = 0; i < ecPerBlock; i++)
+      for (var j = 0; j < blocks.length; j++)
+        result.push(blocks[j].ec[i]);
+
+    // Add remainder bits
+    var remBits = [0,0,7,7,7,7,7,0,0,0,0,0,0,0,3,3,3,3,3,3,3,4,4,4,4,4,4,4,3,3,3,3,3,3,3,0,0,0,0,0,0];
+    for (var i = 0; i < remBits[ver]; i++) result.push(0);
+
+    // Build matrix
+    var size = ver * 4 + 17;
+    var matrix = new Array(size);
+    for (var i = 0; i < size; i++) matrix[i] = new Array(size).fill(null);
+
+    // Finder patterns
+    function placeFinder(r, c) {
+      for (var i = -1; i <= 7; i++)
+        for (var j = -1; j <= 7; j++)
+          if (r+i >= 0 && r+i < size && c+j >= 0 && c+j < size)
+            matrix[r+i][c+j] = (i>=0&&i<=6&&(j===0||j===6))||(j>=0&&j<=6&&(i===0||i===6))||(i>=2&&i<=4&&j>=2&&j<=4) ? 1 : 0;
+    }
+    placeFinder(0, 0);
+    placeFinder(0, size - 7);
+    placeFinder(size - 7, 0);
+
+    // Timing patterns
+    for (var i = 8; i < size - 8; i++) {
+      matrix[6][i] = matrix[i][6] = (i % 2 === 0) ? 1 : 0;
+    }
+
+    // Alignment patterns
+    var apos = APOS[ver];
+    if (apos) {
+      for (var ai = 0; ai < apos.length; ai++) {
+        for (var aj = 0; aj < apos.length; aj++) {
+          var ar = apos[ai], ac = apos[aj];
+          if (matrix[ar][ac] !== null) continue;
+          for (var i = -2; i <= 2; i++)
+            for (var j = -2; j <= 2; j++)
+              matrix[ar+i][ac+j] = (i===-2||i===2||j===-2||j===2||(i===0&&j===0)) ? 1 : 0;
+        }
+      }
+    }
+
+    // Dark module
+    matrix[size-8][8] = 1;
+
+    // Reserve format info areas
+    for (var i = 0; i < 9; i++) { if (matrix[i][8] === null) matrix[i][8] = -1; if (matrix[8][i] === null) matrix[8][i] = -1; }
+    for (var i = 0; i < 8; i++) if (matrix[size-1-i][8] === null) matrix[size-1-i][8] = -1;
+    for (var i = 0; i < 8; i++) if (matrix[8][size-1-i] === null) matrix[8][size-1-i] = -1;
+
+    // Reserve version info for ver >= 7
+    if (ver >= 7) {
+      var vi = getBCHBits(ver);
+      for (var i = 0; i < 18; i++) {
+        var bit = (vi >> i) & 1;
+        matrix[Math.floor(i/3)][i%3 + size-11] = bit;
+        matrix[i%3 + size-11][Math.floor(i/3)] = bit;
+      }
+    }
+
+    // Place data
+    var dataIdx = 0;
+    var up = true;
+    for (var c = size - 1; c >= 0; c -= 2) {
+      if (c === 6) c = 5;
+      for (var r = up ? size - 1 : 0; up ? r >= 0 : r < size; r += up ? -1 : 1) {
+        for (var dc = 0; dc < 2; dc++) {
+          var col = c - dc;
+          if (col < 0 || matrix[r][col] !== null) continue;
+          matrix[r][col] = dataIdx < result.length ? result[dataIdx++] : 0;
+        }
+      }
+      up = !up;
+    }
+
+    // Try masks and pick best
+    var bestMask = 0, bestScore = Infinity;
+    for (var mask = 0; mask < 8; mask++) {
+      var score = 0;
+      // Evaluate
+      for (var r = 0; r < size; r++) {
+        var run = 0, prev = null;
+        for (var c = 0; c < size; c++) {
+          var v = matrix[r][c];
+          if (v === -1) v = 0;
+          v = applyMask(v, r, c, mask);
+          if (v === prev) run++; else { if (run >= 5) score += run - 2; run = 1; prev = v; }
+        }
+        if (run >= 5) score += run - 2;
+      }
+      for (var c = 0; c < size; c++) {
+        var run = 0, prev = null;
+        for (var r = 0; r < size; r++) {
+          var v = matrix[r][c];
+          if (v === -1) v = 0;
+          v = applyMask(v, r, c, mask);
+          if (v === prev) run++; else { if (run >= 5) score += run - 2; run = 1; prev = v; }
+        }
+        if (run >= 5) score += run - 2;
+      }
+      // 2x2 blocks
+      for (var r = 0; r < size - 1; r++)
+        for (var c = 0; c < size - 1; c++) {
+          var a = applyMask(matrix[r][c]===-1?0:matrix[r][c], r, c, mask);
+          var b = applyMask(matrix[r][c+1]===-1?0:matrix[r][c+1], r, c+1, mask);
+          var d = applyMask(matrix[r+1][c]===-1?0:matrix[r+1][c], r+1, c, mask);
+          var e = applyMask(matrix[r+1][c+1]===-1?0:matrix[r+1][c+1], r+1, c+1, mask);
+          if (a===b&&b===d&&d===e) score += 3;
+        }
+      if (score < bestScore) { bestScore = score; bestMask = mask; }
+    }
+
+    function applyMask(bit, r, c, mask) {
+      if (bit === -1) return 0;
+      var invert = false;
+      switch(mask) {
+        case 0: invert = (r+c)%2===0; break;
+        case 1: invert = r%2===0; break;
+        case 2: invert = c%3===0; break;
+        case 3: invert = (r+c)%3===0; break;
+        case 4: invert = (Math.floor(r/2)+Math.floor(c/3))%2===0; break;
+        case 5: invert = ((r*c)%2)+((r*c)%3)===0; break;
+        case 6: invert = (((r*c)%2)+((r*c)%3))%2===0; break;
+        case 7: invert = (((r+c)%2)+((r*c)%3))%2===0; break;
+      }
+      return invert ? (bit ? 0 : 1) : bit;
+    }
+
+    // Apply best mask and format info
+    for (var r = 0; r < size; r++)
+      for (var c = 0; c < size; c++)
+        matrix[r][c] = applyMask(matrix[r][c], r, c, bestMask);
+
+    // Place format info
+    var fi = FORMAT_INFO[bestMask][eclIdx-1];
+    for (var i = 0; i < 15; i++) {
+      var bit = fi[i];
+      if (i < 6) matrix[i][8] = bit;
+      else if (i < 8) matrix[i+1][8] = bit;
+      else if (i < 9) matrix[8][15-i] = bit;
+      else matrix[8][14-i] = bit;
+      if (i < 8) matrix[8][size-1-i] = bit;
+      else matrix[size-15+i][8] = bit;
+    }
+
+    return { matrix: matrix, size: size };
+  }
+
+  return { generate: generate };
+})();
+
+function drawQR(text) {
+  var qr = QR.generate(text, 'L');
+  var c = document.getElementById('qr-canvas');
+  var ctx = c.getContext('2d');
+  var size = qr.size;
+  var quiet = 8; // quiet zone in modules
+  var total = size + quiet * 2;
+  var scale = Math.floor(c.width / total);
+
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, c.width, c.height);
+
+  ctx.fillStyle = '#000';
+  for (var r = 0; r < size; r++) {
+    for (var col = 0; col < size; col++) {
+      if (qr.matrix[r][col]) {
+        ctx.fillRect((quiet + col) * scale, (quiet + r) * scale, scale, scale);
+      }
+    }
+  }
+}
+
+function clearAllRecords() {
+  if (loadRecords().length === 0) {
+    showToast('暂无记录', 'error');
+    return;
+  }
+  if (confirm('确定要清空全部历史记录吗？此操作不可撤销。')) {
+    saveRecords([]);
+    renderHistory();
+    showToast('已清空全部记录', 'success');
+  }
+}
+
+// ==================== Event Bindings ====================
+document.querySelectorAll('.team').forEach(el => initSwipe(el));
+
+document.getElementById('btn-reset').addEventListener('click', resetGame);
+document.getElementById('btn-fullscreen').addEventListener('click', requestFS);
+
+$panelToggle.addEventListener('click', function(e) {
+  e.stopPropagation();
+  togglePanel();
+});
+
+// Close panel when clicking outside
+document.addEventListener('click', function(e) {
+  if (state.isPanelOpen && !$panel.contains(e.target) && e.target !== $panelToggle) {
+    closePanel();
+  }
+});
+
+// Fullscreen exit: click on black background, hint text, or gap between teams
+$app.addEventListener('click', function(e) {
+  if (!state.isFullscreen) return;
+  const target = e.target;
+  // Exit if clicking on: app container, score-area (gap between teams), or hint
+  if (target === $app || target === $scoreArea || target === $hint) {
+    exitFS();
+  }
+});
+
+document.addEventListener('fullscreenchange', handleFSChange);
+document.addEventListener('webkitfullscreenchange', handleFSChange);
+
+// Panel buttons
+document.getElementById('btn-save').addEventListener('click', saveRecord);
+document.getElementById('btn-new-game').addEventListener('click', newGame);
+document.getElementById('btn-copy').addEventListener('click', copyText);
+document.getElementById('btn-export').addEventListener('click', exportJSON);
+document.getElementById('btn-paste').addEventListener('click', pasteImport);
+document.getElementById('btn-import').addEventListener('click', function() {
+  $fileInput.click();
+});
+document.getElementById('btn-share-page').addEventListener('click', sharePage);
+document.getElementById('btn-qrcode').addEventListener('click', generateQRCode);
+document.getElementById('btn-clear-all').addEventListener('click', clearAllRecords);
+
+$fileInput.addEventListener('change', function() {
+  if (this.files && this.files[0]) {
+    fileImport(this.files[0]);
+    this.value = '';
+  }
+});
+
+// History list delete delegation
+$historyList.addEventListener('click', function(e) {
+  if (e.target.classList.contains('history-del')) {
+    e.stopPropagation();
+    const id = e.target.dataset.id;
+    if (id) deleteRecord(id);
+  }
+});
+
+// ==================== Init ====================
+function init() {
+  loadState();
+  updateScoreDisplay();
+  updateTime();
+  setInterval(updateTime, 60000);
+  updateOrientationUI();
+
+  // Initial fullscreen state check
+  if (isFS()) {
+    state.isFullscreen = true;
+    $app.classList.add('fs-mode');
+    updateOrientationUI();
+  }
+}
+
+init();
+</script>
+
+</body>
+</html>
