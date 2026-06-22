@@ -1029,14 +1029,6 @@ var QR = (function() {
     [6,26,54,82,110,138,166],[6,30,58,86,114,142,170]
   ];
 
-  // Reminder bits for format info
-  var FORMAT_INFO = [
-    [1,0,1,0,1,1,1,0,0,0,1,1,0,0,1],[0,0,1,0,1,1,0,0,1,1,0,1,1,1,0],
-    [1,1,1,1,1,0,0,1,0,0,0,0,1,0,1],[0,1,0,0,0,1,1,0,1,1,0,1,1,1,1],
-    [1,1,1,1,0,1,1,1,1,0,0,1,0,0,0],[0,1,1,0,1,1,0,0,0,1,1,0,0,1,1],
-    [0,0,0,0,0,1,1,1,0,1,0,1,0,1,0],[1,1,0,1,1,1,1,0,0,1,1,0,1,1,1]
-  ];
-
   function getBCHBits(val) {
     var bch = val << 10;
     for (var i = 4; i >= 0; i--) { var d = 1 << (i + 10); if (bch & d) bch ^= (0x537 << i); }
@@ -1068,8 +1060,12 @@ var QR = (function() {
     addBits(data.length, ver <= 9 ? 8 : 16); // Char count
     for (var i = 0; i < bytes.length; i++) addBits(bytes[i], 8);
     addBits(0, Math.min(4, dc * 8 - bits.length)); // Terminator
-    while (bits.length % 8) bits.push(0); // Pad to byte
-    // Pad bytes
+    while (bits.length % 8) bits.push(0); // Pad to byte boundary
+    // Add remainder bits per QR spec (Table 1)
+    var remBits = [0,0,7,7,7,7,7,0,0,0,0,0,0,0,3,3,3,3,3,3,3,4,4,4,4,4,4,4,3,3,3,3,3,3,3,0,0,0,0,0,0];
+    for (var i = 0; i < remBits[ver]; i++) bits.push(0);
+    while (bits.length % 8) bits.push(0);
+    // Pad bytes to fill data capacity
     var pad = [0xEC, 0x11];
     for (var i = 0, pi = 0; bits.length < dc * 8; i++, pi = (pi+1)%2) {
       addBits(pad[pi], 8);
@@ -1141,10 +1137,6 @@ var QR = (function() {
     for (var e = 0; e < maxEC; e++)
       for (var b = 0; b < blocks.length; b++)
         if (e < blocks[b].ec.length) result.push(blocks[b].ec[e]);
-
-    // Add remainder bits
-    var remBits = [0,0,7,7,7,7,7,0,0,0,0,0,0,0,3,3,3,3,3,3,3,4,4,4,4,4,4,4,3,3,3,3,3,3,3,0,0,0,0,0,0];
-    for (var i = 0; i < remBits[ver]; i++) result.push(0);
 
     // Build matrix
     var size = ver * 4 + 17;
@@ -1272,10 +1264,12 @@ var QR = (function() {
       for (var c = 0; c < size; c++)
         matrix[r][c] = applyMask(matrix[r][c], r, c, bestMask);
 
-    // Place format info
-    var fi = FORMAT_INFO[bestMask][eclIdx-1];
+    // Place format info (EC level + mask, BCH encoded, 15 bits)
+    var ecBits = {L:1, M:0, Q:3, H:2}[ecLevel];
+    var formatData = (ecBits << 3) | bestMask;
+    var fiBits = getBCHBits(formatData);
     for (var i = 0; i < 15; i++) {
-      var bit = fi[i];
+      var bit = (fiBits >> i) & 1;
       if (i < 6) matrix[i][8] = bit;
       else if (i < 8) matrix[i+1][8] = bit;
       else if (i < 9) matrix[8][15-i] = bit;
