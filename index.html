@@ -921,7 +921,8 @@ async function sharePage() {
 
 function generateQRCode() {
   var loc = window.location;
-  var url = loc.href;
+  // Build shortest possible URL: strip query, hash, trailing slash
+  var url = loc.origin + loc.pathname.replace(/\/+$/, '');
 
   // For hosted pages: QR from short URL — always fits
   if (loc.protocol !== 'file:' && url.length < 2000) {
@@ -1293,20 +1294,24 @@ var QR = (function() {
 })();
 
 function drawQR(text) {
-  var qr = QR.generate(text, 'M');
+  // L error correction: smaller QR → bigger modules → easier camera detection
+  var qr = QR.generate(text, 'L');
   if (!qr) { showQRFallback(); return; }
   var c = document.getElementById('qr-canvas');
   var card = document.getElementById('qr-card');
   var dpr = window.devicePixelRatio || 1;
   var size = qr.size;
-  var quiet = 6;
+  var quiet = 4;
   var total = size + quiet * 2;
 
   // 用卡片可用宽度反推模块尺寸，取整保证像素对齐
-  var cardW = card.clientWidth;
-  var avail = Math.min(cardW - 32, window.innerWidth * 0.85);
+  var cardW = card.clientWidth || 320;
+  var avail = Math.min(cardW - 32, window.innerWidth * 0.88);
+  // 确保画布不超出可用空间
   var moduleSize = Math.floor(avail / total);
-  if (moduleSize < 8) moduleSize = 8;
+  if (moduleSize < 6) moduleSize = 6;
+  // 若算出的画布超过可用宽，退一档取整
+  while (total * moduleSize > avail && moduleSize > 6) moduleSize--;
   var px = total * moduleSize;
 
   c.width = px * dpr;
@@ -1318,7 +1323,7 @@ function drawQR(text) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.imageSmoothingEnabled = false;
 
-  // 白底（含 6 模块白边）
+  // 白底（含 4 模块标准白边）
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, px, px);
 
