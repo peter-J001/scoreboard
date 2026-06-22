@@ -191,7 +191,7 @@ html, body {
   bottom: 84px;
   right: 12px;
   width: calc(100vw - 24px);
-  max-width: 420px;
+  max-width: 440px;
   max-height: 0;
   overflow: hidden;
   background: #111;
@@ -296,10 +296,10 @@ html, body {
 #qr-card {
   background: #fff;
   border-radius: 20px;
-  padding: 16px;
+  padding: 12px;
   text-align: center;
-  max-width: 420px;
-  width: 94vw;
+  max-width: 440px;
+  width: 96vw;
 }
 
 #qr-canvas {
@@ -1295,7 +1295,7 @@ var QR = (function() {
 
 function drawQR(text) {
   // L error correction: smaller QR → bigger modules → easier camera detection
-  var qr = QR.generate(text, 'L');
+  var qr = QR.generate(text, 'M');
   if (!qr) { showQRFallback(); return; }
   var c = document.getElementById('qr-canvas');
   var card = document.getElementById('qr-card');
@@ -1306,12 +1306,12 @@ function drawQR(text) {
 
   // 用卡片可用宽度反推模块尺寸，取整保证像素对齐
   var cardW = card.clientWidth || 320;
-  var avail = Math.min(cardW - 32, window.innerWidth * 0.88);
+  var avail = Math.min(cardW - 24, window.innerWidth * 0.92);
   // 确保画布不超出可用空间
   var moduleSize = Math.floor(avail / total);
-  if (moduleSize < 6) moduleSize = 6;
+  if (moduleSize < 8) moduleSize = 8;
   // 若算出的画布超过可用宽，退一档取整
-  while (total * moduleSize > avail && moduleSize > 6) moduleSize--;
+  while (total * moduleSize > avail && moduleSize > 8) moduleSize--;
   var px = total * moduleSize;
 
   c.width = px * dpr;
