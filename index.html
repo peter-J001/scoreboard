@@ -483,7 +483,7 @@ html, body {
 <div id="qr-overlay" onclick="if(event.target===this)this.classList.remove('show')">
   <div id="qr-card">
     <div class="qr-title">扫描二维码获取记分板</div>
-    <canvas id="qr-canvas" width="260" height="260"></canvas>
+    <canvas id="qr-canvas"></canvas>
     <div class="qr-hint" id="qr-hint-text">用手机相机扫描二维码即可打开</div>
     <button id="qr-close" onclick="document.getElementById('qr-overlay').classList.remove('show')">关闭</button>
   </div>
@@ -1287,20 +1287,33 @@ var QR = (function() {
 function drawQR(text) {
   var qr = QR.generate(text, 'L');
   var c = document.getElementById('qr-canvas');
-  var ctx = c.getContext('2d');
   var size = qr.size;
-  var quiet = 8; // quiet zone in modules
+  var quiet = 4; // 4-module quiet zone (QR spec minimum)
+  var moduleSize = 10; // pixels per module at native resolution
   var total = size + quiet * 2;
-  var scale = Math.floor(c.width / total);
+  var canvasSize = total * moduleSize;
 
+  // Set canvas to exact pixel dimensions — no fractional scaling
+  c.width = canvasSize;
+  c.height = canvasSize;
+  // CSS display size (square, fits mobile screens)
+  c.style.width = '250px';
+  c.style.height = '250px';
+
+  var ctx = c.getContext('2d');
+  // Disable anti-aliasing for crisp module edges
+  ctx.imageSmoothingEnabled = false;
+
+  // White background
   ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.fillRect(0, 0, canvasSize, canvasSize);
 
+  // Black modules — each module is exactly moduleSize×moduleSize pixels
   ctx.fillStyle = '#000';
   for (var r = 0; r < size; r++) {
     for (var col = 0; col < size; col++) {
       if (qr.matrix[r][col]) {
-        ctx.fillRect((quiet + col) * scale, (quiet + r) * scale, scale, scale);
+        ctx.fillRect((quiet + col) * moduleSize, (quiet + r) * moduleSize, moduleSize, moduleSize);
       }
     }
   }
