@@ -191,7 +191,7 @@ html, body {
   bottom: 84px;
   right: 12px;
   width: calc(100vw - 24px);
-  max-width: 360px;
+  max-width: 420px;
   max-height: 0;
   overflow: hidden;
   background: #111;
@@ -296,15 +296,15 @@ html, body {
 #qr-card {
   background: #fff;
   border-radius: 20px;
-  padding: 24px;
+  padding: 16px;
   text-align: center;
-  max-width: 360px;
-  width: 90%;
+  max-width: 420px;
+  width: 94vw;
 }
 
 #qr-canvas {
-  width: 260px;
-  height: 260px;
+  // width set by JS
+  // height set by JS
   display: block;
   margin: 0 auto;
   image-rendering: pixelated;
@@ -1294,17 +1294,21 @@ var QR = (function() {
 
 function drawQR(text) {
   var qr = QR.generate(text, 'M');
+  if (!qr) { showQRFallback(); return; }
   var c = document.getElementById('qr-canvas');
+  var card = document.getElementById('qr-card');
   var dpr = window.devicePixelRatio || 1;
   var size = qr.size;
-  var quiet = 4;
+  var quiet = 6;
   var total = size + quiet * 2;
 
-  // 1. 整数模块尺寸：用 260 反推，取整得到 moduleSize
-  var moduleSize = Math.floor(300 / total);
-  var px = total * moduleSize; // 整数画布尺寸 = 总模块数 × 整数缩放
+  // 用卡片可用宽度反推模块尺寸，取整保证像素对齐
+  var cardW = card.clientWidth;
+  var avail = Math.min(cardW - 32, window.innerWidth * 0.85);
+  var moduleSize = Math.floor(avail / total);
+  if (moduleSize < 8) moduleSize = 8;
+  var px = total * moduleSize;
 
-  // 2. 统一原生/CSS 宽高 + 适配 dpr
   c.width = px * dpr;
   c.height = px * dpr;
   c.style.width = px + 'px';
@@ -1314,11 +1318,10 @@ function drawQR(text) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.imageSmoothingEnabled = false;
 
-  // 白底
+  // 白底（含 6 模块白边）
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, px, px);
 
-  // 3. 绘制坐标：整数 moduleSize，无小数偏移
   ctx.fillStyle = '#000';
   for (var r = 0; r < size; r++) {
     for (var col = 0; col < size; col++) {
