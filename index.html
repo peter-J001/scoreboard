@@ -339,6 +339,60 @@ html, body {
 #toast.success { border-color: #22c55e; color: #22c55e; }
 #toast.error { border-color: #EF4444; color: #EF4444; }
 
+/* ===== Confetti Canvas ===== */
+#confetti-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 500;
+  pointer-events: none;
+}
+#confetti-canvas.active { pointer-events: auto; }
+
+/* ===== Toggle Switch ===== */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 4px;
+}
+.toggle-label {
+  font-size: 13px;
+  color: #ccc;
+}
+.toggle-switch {
+  position: relative;
+  width: 48px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.toggle-switch input { display: none; }
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #333;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  left: 3px;
+  bottom: 3px;
+  background: #888;
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+.toggle-switch input:checked + .toggle-slider { background: #1a3a5c; }
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+  background: #3B82F6;
+}
+
 /* ===== Fullscreen styles (via .fs-mode class) ===== */
 #app.fs-mode {
   background: #000;
@@ -427,12 +481,21 @@ html, body {
     <button class="panel-btn share-btn" id="btn-share-page">发送页面文件</button>
     <div class="panel-hint">点击"发送页面文件"可通过 AirDrop / 附近分享 直接发送给好友，对方浏览器直接打开。</div>
     <div class="panel-divider"></div>
+    <div class="toggle-row">
+      <span class="toggle-label">获胜彩带与震动</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="toggle-confetti" checked>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="panel-divider"></div>
     <div class="panel-title">历史记录</div>
     <div id="history-list"><div class="empty-history">暂无记录</div></div>
     <button class="panel-btn danger" id="btn-clear-all">一键清空全部记录</button>
   </div>
 </div>
 
+<canvas id="confetti-canvas"></canvas>
 <div id="toast"></div>
 
 <script>
@@ -452,7 +515,9 @@ const state = {
   redScore: 0,
   isFullscreen: false,
   isPanelOpen: false,
-  orientation: 'portrait'
+  orientation: 'portrait',
+  confettiEnabled: true,
+  victoryTriggered: false
 };
 
 // ==================== Storage ====================
@@ -516,6 +581,7 @@ function updateScore(team, delta) {
   updateScoreDisplay();
   animateScore(team);
   saveState();
+  checkVictory();
 }
 
 function updateOrientationUI() {
@@ -673,6 +739,7 @@ function togglePanel() {
 function resetGame() {
   state.blueScore = 0;
   state.redScore = 0;
+  state.victoryTriggered = false;
   updateScoreDisplay();
   saveState();
   showToast('已重置', 'success');
@@ -681,6 +748,7 @@ function resetGame() {
 function newGame() {
   state.blueScore = 0;
   state.redScore = 0;
+  state.victoryTriggered = false;
   updateScoreDisplay();
   saveState();
   showToast('新对局已开始', 'success');
@@ -787,7 +855,106 @@ async function sharePage() {
   }
 }
 
+// ==================== Victory & Confetti ====================
+function checkVictory() {
+  if (!state.confettiEnabled || state.victoryTriggered) return;
+  var b = state.blueScore, r = state.redScore;
+  var winner = null;
+  if (b === 30) winner = 'blue';
+  else if (r === 30) winner = 'red';
+  else if (b >= 21 && b - r >= 2) winner = 'blue';
+  else if (r >= 21 && r - b >= 2) winner = 'red';
+  if (!winner) return;
+  state.victoryTriggered = true;
+  vibrateWin();
+  startConfetti(winner);
+}
 
+function vibrateWin() {
+  if (!navigator.vibrate) return;
+  try { navigator.vibrate([100, 50, 100, 50, 100]); } catch(e) {}
+}
+
+function startConfetti(winner) {
+  var canvas = document.getElementById('confetti-canvas');
+  var ctx = canvas.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+  var W = window.innerWidth;
+  var H = window.innerHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  canvas.classList.add('active');
+
+  var colors = winner === 'blue'
+    ? ['#3B82F6','#60A5FA','#93C5FD','#fff','#FBBF24','#F87171']
+    : ['#EF4444','#F87171','#FCA5A5','#FBBF24','#fff','#60A5FA'];
+
+  var particles = [];
+  var PARTICLE_COUNT = 180;
+  for (var i = 0; i < PARTICLE_COUNT; i++) {
+    particles.push({
+      x: Math.random() * W,
+      y: Math.random() * H * -1.2,
+      w: 4 + Math.random() * 8,
+      h: 6 + Math.random() * 10,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      vx: (Math.random() - 0.5) * 1.8,
+      vy: 2 + Math.random() * 4,
+      rot: Math.random() * Math.PI * 2,
+      rotV: (Math.random() - 0.5) * 0.3,
+      opacity: 1
+    });
+  }
+
+  var startTime = performance.now();
+  var DURATION = 2500;
+  var raf;
+
+  function draw(now) {
+    var elapsed = now - startTime;
+    ctx.clearRect(0, 0, W, H);
+
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rot += p.rotV;
+      p.vx *= 0.999;
+      p.vy += 0.02;
+
+      var fadeStart = DURATION - 600;
+      if (elapsed > fadeStart) {
+        p.opacity = Math.max(0, 1 - (elapsed - fadeStart) / 600);
+      }
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.globalAlpha = p.opacity;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+    }
+
+    if (elapsed < DURATION) {
+      raf = requestAnimationFrame(draw);
+    } else {
+      stopConfetti();
+    }
+  }
+
+  function stopConfetti() {
+    if (raf) cancelAnimationFrame(raf);
+    ctx.clearRect(0, 0, W, H);
+    canvas.classList.remove('active');
+  }
+
+  canvas.onclick = function(e) { e.stopPropagation(); stopConfetti(); };
+  raf = requestAnimationFrame(draw);
+}
 
 function clearAllRecords() {
   if (loadRecords().length === 0) {
@@ -838,6 +1005,9 @@ document.getElementById('btn-new-game').addEventListener('click', newGame);
 document.getElementById('btn-copy').addEventListener('click', copyText);
 document.getElementById('btn-share-page').addEventListener('click', sharePage);
 document.getElementById('btn-clear-all').addEventListener('click', clearAllRecords);
+document.getElementById('toggle-confetti').addEventListener('change', function() {
+  state.confettiEnabled = this.checked;
+});
 
 // History list delete delegation
 $historyList.addEventListener('click', function(e) {
