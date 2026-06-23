@@ -348,7 +348,6 @@ html, body {
   z-index: 500;
   pointer-events: none;
 }
-#confetti-canvas.active { pointer-events: auto; }
 
 /* ===== Toggle Switch ===== */
 .toggle-row {
@@ -882,7 +881,6 @@ function startConfetti(winner) {
   canvas.style.width = W + 'px';
   canvas.style.height = H + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  canvas.classList.add('active');
 
   var colors = winner === 'blue'
     ? ['#3B82F6','#60A5FA','#93C5FD','#fff','#FBBF24','#F87171']
@@ -945,10 +943,8 @@ function startConfetti(winner) {
   function stopConfetti() {
     if (raf) cancelAnimationFrame(raf);
     ctx.clearRect(0, 0, W, H);
-    canvas.classList.remove('active');
   }
 
-  canvas.onclick = function(e) { e.stopPropagation(); stopConfetti(); };
   raf = requestAnimationFrame(draw);
 }
 
